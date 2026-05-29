@@ -29,7 +29,7 @@
     "node-pty": "1.0.0",
     "ws": "8.18.2",
     "chokidar": "4.0.3",
-    "zod": "3.25.67",
+    "zod": "3.25.76",
     "nanoid": "5.1.5",
     "ai": "4.3.16",
     "@ai-sdk/openai-compatible": "0.2.14",
