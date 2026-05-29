@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSettingsStore } from "@/store/settingsStore";
-import { useTheme, themes } from "@/modules/theme";
+import { useTheme } from "@/modules/theme";
+import { themes } from "@/modules/theme/themes";
 import { AiSettings } from "@/modules/ai/AiSettings";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +14,7 @@ function GeneralSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Theme</h3>
+        <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-3">Theme</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {themes.map((t) => (
             <button
@@ -23,38 +24,39 @@ function GeneralSection() {
                 setGeneral({ theme: t.id });
               }}
               className={cn(
-                "p-3 rounded-lg border transition-all text-left",
+                "p-2.5 rounded-xl border transition-all text-left group",
                 theme.id === t.id
-                  ? "border-[var(--accent)] ring-1 ring-[var(--accent)]"
-                  : "border-[var(--border)] hover:border-[var(--text-secondary)]",
+                  ? "border-[var(--accent)] bg-[var(--accent)]/5 shadow-[0_0_12px_var(--accent-glow)]"
+                  : "border-[var(--border-subtle)] hover:border-[var(--border)] bg-[var(--bg-primary)]",
               )}
             >
-              {/* Theme preview */}
               <div
-                className="w-full h-8 rounded mb-2 flex gap-0.5 overflow-hidden"
+                className="w-full h-7 rounded-lg mb-2 flex gap-0.5 overflow-hidden border border-black/20"
                 style={{ background: t.colors.bgPrimary }}
               >
                 <div className="w-1/4 h-full" style={{ background: t.colors.bgSecondary }} />
-                <div className="flex-1 h-full flex flex-col gap-0.5 p-1">
-                  <div className="h-1 rounded" style={{ background: t.colors.accent, width: "60%" }} />
-                  <div className="h-1 rounded" style={{ background: t.colors.textSecondary, width: "80%" }} />
-                  <div className="h-1 rounded" style={{ background: t.colors.textSecondary, width: "40%" }} />
+                <div className="flex-1 h-full flex flex-col gap-0.5 p-1 justify-center">
+                  <div className="h-[2px] rounded-full" style={{ background: t.colors.accent, width: "60%" }} />
+                  <div className="h-[2px] rounded-full" style={{ background: t.colors.textMuted, width: "80%" }} />
+                  <div className="h-[2px] rounded-full" style={{ background: t.colors.textMuted, width: "45%" }} />
                 </div>
               </div>
-              <span className="text-xs text-[var(--text-primary)]">{t.name}</span>
+              <span className="text-[10px] font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                {t.name}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">Workspace Path</h3>
+        <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Workspace</h3>
         <input
           type="text"
           value={general.workspacePath}
           onChange={(e) => setGeneral({ workspacePath: e.target.value })}
-          placeholder="/data/data/com.termux/files/home"
-          className="w-full px-3 py-2 rounded text-sm bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)]"
+          placeholder="~/projects"
+          className="w-full px-3 py-2 rounded-lg text-[11px] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--accent)]/40 focus:shadow-[0_0_8px_var(--accent-glow)] transition-all font-[var(--font-mono)]"
         />
       </div>
     </div>
@@ -67,9 +69,9 @@ function EditorSection() {
   return (
     <div className="space-y-5">
       <div>
-        <label className="flex items-center justify-between text-sm text-[var(--text-primary)] mb-2">
-          <span>Font Size</span>
-          <span className="text-xs text-[var(--text-secondary)]">{editor.fontSize}px</span>
+        <label className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] mb-2">
+          <span className="font-medium">Font Size</span>
+          <span className="font-[var(--font-mono)] text-[var(--accent)]">{editor.fontSize}px</span>
         </label>
         <input
           type="range"
@@ -77,68 +79,42 @@ function EditorSection() {
           max={24}
           value={editor.fontSize}
           onChange={(e) => setEditor({ fontSize: Number(e.target.value) })}
-          className="w-full accent-[var(--accent)]"
+          className="w-full"
         />
       </div>
 
       <div>
-        <label className="text-sm text-[var(--text-primary)] mb-2 block">Tab Size</label>
+        <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-2 block">Tab Size</label>
         <div className="flex gap-2">
           {([2, 4] as const).map((size) => (
             <button
               key={size}
               onClick={() => setEditor({ tabSize: size })}
               className={cn(
-                "px-4 py-2 rounded text-sm transition-colors",
+                "px-4 py-1.5 rounded-lg text-[11px] font-medium transition-all font-[var(--font-mono)]",
                 editor.tabSize === size
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border)] hover:text-[var(--text-primary)]",
+                  ? "bg-[var(--accent)] text-white shadow-[0_0_8px_var(--accent-glow)]"
+                  : "bg-[var(--bg-primary)] text-[var(--text-muted)] border border-[var(--border-subtle)] hover:border-[var(--border)] hover:text-[var(--text-secondary)]",
               )}
             >
-              {size} spaces
+              {size}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-[var(--text-primary)]">Word Wrap</span>
-        <button
-          onClick={() => setEditor({ wordWrap: !editor.wordWrap })}
-          className={cn(
-            "w-10 h-5 rounded-full transition-colors relative",
-            editor.wordWrap ? "bg-[var(--accent)]" : "bg-[var(--border)]",
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
-              editor.wordWrap ? "translate-x-5" : "translate-x-0.5",
-            )}
-          />
-        </button>
-      </div>
+      <ToggleRow
+        label="Word Wrap"
+        value={editor.wordWrap}
+        onChange={() => setEditor({ wordWrap: !editor.wordWrap })}
+      />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm text-[var(--text-primary)]">Vim Mode</span>
-          <p className="text-[10px] text-[var(--text-secondary)]">Coming soon</p>
-        </div>
-        <button
-          onClick={() => setEditor({ vimMode: !editor.vimMode })}
-          className={cn(
-            "w-10 h-5 rounded-full transition-colors relative",
-            editor.vimMode ? "bg-[var(--accent)]" : "bg-[var(--border)]",
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
-              editor.vimMode ? "translate-x-5" : "translate-x-0.5",
-            )}
-          />
-        </button>
-      </div>
+      <ToggleRow
+        label="Vim Mode"
+        subtitle="Experimental"
+        value={editor.vimMode}
+        onChange={() => setEditor({ vimMode: !editor.vimMode })}
+      />
     </div>
   );
 }
@@ -149,9 +125,9 @@ function TerminalSection() {
   return (
     <div className="space-y-5">
       <div>
-        <label className="flex items-center justify-between text-sm text-[var(--text-primary)] mb-2">
-          <span>Font Size</span>
-          <span className="text-xs text-[var(--text-secondary)]">{terminal.fontSize}px</span>
+        <label className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] mb-2">
+          <span className="font-medium">Font Size</span>
+          <span className="font-[var(--font-mono)] text-[var(--accent)]">{terminal.fontSize}px</span>
         </label>
         <input
           type="range"
@@ -159,14 +135,14 @@ function TerminalSection() {
           max={20}
           value={terminal.fontSize}
           onChange={(e) => setTerminal({ fontSize: Number(e.target.value) })}
-          className="w-full accent-[var(--accent)]"
+          className="w-full"
         />
       </div>
 
       <div>
-        <label className="flex items-center justify-between text-sm text-[var(--text-primary)] mb-2">
-          <span>Scrollback Lines</span>
-          <span className="text-xs text-[var(--text-secondary)]">{terminal.scrollbackLines}</span>
+        <label className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] mb-2">
+          <span className="font-medium">Scrollback</span>
+          <span className="font-[var(--font-mono)] text-[var(--accent)]">{terminal.scrollbackLines}</span>
         </label>
         <input
           type="range"
@@ -175,7 +151,7 @@ function TerminalSection() {
           step={500}
           value={terminal.scrollbackLines}
           onChange={(e) => setTerminal({ scrollbackLines: Number(e.target.value) })}
-          className="w-full accent-[var(--accent)]"
+          className="w-full"
         />
       </div>
     </div>
@@ -184,33 +160,56 @@ function TerminalSection() {
 
 function AboutSection() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">PocketDevOS</h3>
+          <p className="text-[10px] text-[var(--text-muted)] font-[var(--font-mono)]">v0.1.0</p>
+        </div>
+      </div>
+      <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+        AI-native developer workspace. Built with React, xterm.js, CodeMirror, and autonomous AI assistance.
+      </p>
+      <div className="space-y-1.5">
+        <a
+          href="https://github.com/Yashpatole81/PocketDevOS"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-[11px] text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+        >
+          → GitHub Repository
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function ToggleRow({ label, subtitle, value, onChange }: { label: string; subtitle?: string; value: boolean; onChange: () => void }) {
+  return (
+    <div className="flex items-center justify-between">
       <div>
-        <h3 className="text-sm font-medium text-[var(--text-primary)]">PocketDevOS</h3>
-        <p className="text-xs text-[var(--text-secondary)] mt-1">Version 0.1.0</p>
+        <span className="text-[11px] font-medium text-[var(--text-secondary)]">{label}</span>
+        {subtitle && <p className="text-[9px] text-[var(--text-muted)]">{subtitle}</p>}
       </div>
-      <div className="text-xs text-[var(--text-secondary)] space-y-2">
-        <p>A mobile-first development environment that runs anywhere.</p>
-        <p>Built with React, xterm.js, CodeMirror, and AI-powered assistance.</p>
-      </div>
-      <div className="space-y-1">
-        <a
-          href="https://github.com/pocketdevos"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-xs text-[var(--accent)] hover:underline"
-        >
-          GitHub Repository
-        </a>
-        <a
-          href="https://github.com/pocketdevos/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-xs text-[var(--accent)] hover:underline"
-        >
-          Report an Issue
-        </a>
-      </div>
+      <button
+        onClick={onChange}
+        className={cn(
+          "w-9 h-5 rounded-full transition-all relative",
+          value ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]" : "bg-[var(--border)]",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm",
+            value ? "translate-x-[18px]" : "translate-x-0.5",
+          )}
+        />
+      </button>
     </div>
   );
 }
@@ -228,30 +227,32 @@ export function SettingsPage() {
     );
   }
 
-  const tabs: { id: SettingsTab; label: string; icon: string }[] = [
-    { id: "general", label: "General", icon: "⚙️" },
-    { id: "editor", label: "Editor", icon: "📝" },
-    { id: "terminal", label: "Terminal", icon: "💻" },
-    { id: "ai", label: "AI", icon: "🤖" },
-    { id: "about", label: "About", icon: "ℹ️" },
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: "general", label: "General" },
+    { id: "editor", label: "Editor" },
+    { id: "terminal", label: "Terminal" },
+    { id: "ai", label: "AI" },
+    { id: "about", label: "About" },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg max-h-[90vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-[var(--bg-overlay)] backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+      <div className="w-full max-w-lg max-h-[85vh] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] flex flex-col overflow-hidden shadow-lg">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
-          <h2 className="text-sm font-medium text-[var(--text-primary)]">Settings</h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] shrink-0">
+          <h2 className="text-[12px] font-semibold text-[var(--text-primary)]">Settings</h2>
           <button
             onClick={closeSettings}
-            className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all"
           >
-            ✕
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+            </svg>
           </button>
         </div>
 
         {/* Tab bar */}
-        <div className="flex border-b border-[var(--border)] px-2 shrink-0 overflow-x-auto">
+        <div className="flex border-b border-[var(--border-subtle)] px-3 shrink-0 overflow-x-auto gap-0.5">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -263,13 +264,12 @@ export function SettingsPage() {
                 }
               }}
               className={cn(
-                "px-3 py-2 text-xs whitespace-nowrap transition-colors border-b-2",
+                "px-3 py-2 text-[10px] font-medium whitespace-nowrap transition-all border-b-2 uppercase tracking-wide",
                 activeTab === tab.id
-                  ? "border-[var(--accent)] text-[var(--text-primary)]"
-                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
               )}
             >
-              <span className="mr-1">{tab.icon}</span>
               {tab.label}
             </button>
           ))}

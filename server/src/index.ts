@@ -49,6 +49,12 @@ await app.register(aiRoutes, { prefix: "/api/ai" });
 // Health check (no auth required - handled in authHook)
 app.get("/api/health", async () => ({ status: "ok", version: "0.1.0" }));
 
+// Workspace info (returns the default workspace path for this platform)
+app.get("/api/workspace", async () => {
+  const { homedir } = await import("node:os");
+  return { home: homedir().replace(/\\/g, "/") };
+});
+
 // Start server
 try {
   await app.listen({ port: PORT, host: HOST });

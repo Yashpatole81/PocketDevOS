@@ -13,36 +13,43 @@ const STORAGE_KEY = "pocketdevos-theme";
 
 function applyThemeToRoot(theme: Theme) {
   const root = document.documentElement;
-  root.style.setProperty("--bg-primary", theme.colors.bgPrimary);
-  root.style.setProperty("--bg-secondary", theme.colors.bgSecondary);
-  root.style.setProperty("--bg-tertiary", theme.colors.bgTertiary);
-  root.style.setProperty("--border", theme.colors.border);
-  root.style.setProperty("--text-primary", theme.colors.textPrimary);
-  root.style.setProperty("--text-secondary", theme.colors.textSecondary);
-  root.style.setProperty("--accent", theme.colors.accent);
-  root.style.setProperty("--accent-hover", theme.colors.accentHover);
-  root.style.setProperty("--danger", theme.colors.danger);
-  root.style.setProperty("--success", theme.colors.success);
+  const c = theme.colors;
 
-  // Update meta theme-color for mobile browsers
+  root.style.setProperty("--bg-primary", c.bgPrimary);
+  root.style.setProperty("--bg-secondary", c.bgSecondary);
+  root.style.setProperty("--bg-tertiary", c.bgTertiary);
+  root.style.setProperty("--bg-elevated", c.bgElevated);
+  root.style.setProperty("--bg-terminal", c.bgTerminal);
+  root.style.setProperty("--bg-sidebar", c.bgSidebar);
+  root.style.setProperty("--border", c.border);
+  root.style.setProperty("--border-subtle", c.borderSubtle);
+  root.style.setProperty("--text-primary", c.textPrimary);
+  root.style.setProperty("--text-secondary", c.textSecondary);
+  root.style.setProperty("--text-muted", c.textMuted);
+  root.style.setProperty("--accent", c.accent);
+  root.style.setProperty("--accent-hover", c.accentHover);
+  root.style.setProperty("--accent-glow", c.accentGlow);
+  root.style.setProperty("--danger", c.danger);
+  root.style.setProperty("--success", c.success);
+  root.style.setProperty("--warning", c.warning);
+  root.style.setProperty("--info", c.info);
+
+  // Update meta theme-color
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) {
-    meta.setAttribute("content", theme.colors.bgPrimary);
-  }
+  if (meta) meta.setAttribute("content", c.bgPrimary);
 }
 
 function loadSavedThemeId(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) || "dark";
+    return localStorage.getItem(STORAGE_KEY) || "cyberdeck";
   } catch {
-    return "dark";
+    return "cyberdeck";
   }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => getThemeById(loadSavedThemeId()));
 
-  // Apply theme on mount and changes
   useEffect(() => {
     applyThemeToRoot(theme);
   }, [theme]);
@@ -66,8 +73,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    throw new Error("useTheme must be used within a ThemeProvider");
-  }
+  if (!ctx) throw new Error("useTheme must be used within a ThemeProvider");
   return ctx;
 }

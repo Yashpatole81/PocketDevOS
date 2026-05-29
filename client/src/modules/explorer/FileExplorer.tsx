@@ -9,41 +9,38 @@ interface TreeNode extends FsEntry {
   loading?: boolean;
 }
 
-function getFileIcon(name: string, isDirectory: boolean): string {
-  if (isDirectory) return "📁";
-
+function getFileColor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase();
   switch (ext) {
     case "ts":
     case "tsx":
-      return "🟦";
+      return "#38BDF8"; // info blue
     case "js":
     case "jsx":
-      return "🟨";
-    case "json":
-      return "📋";
-    case "md":
-      return "📝";
-    case "css":
-      return "🎨";
-    case "html":
-      return "🌐";
+      return "#FBBF24"; // yellow
+    case "rs":
+      return "#FB923C"; // bronze/orange
     case "py":
-      return "🐍";
+      return "#4ADE80"; // green
+    case "md":
+    case "mdx":
+      return "#67E8F9"; // cyan
+    case "json":
+      return "#A78BFA"; // purple
+    case "css":
+    case "scss":
+      return "#F472B6"; // pink
+    case "html":
+      return "#FB923C"; // orange
     case "sh":
     case "bash":
-      return "⚙️";
+      return "#4ADE80"; // green
     case "yaml":
     case "yml":
-      return "📄";
     case "toml":
-      return "📄";
-    case "lock":
-      return "🔒";
-    case "gitignore":
-      return "👁️";
+      return "#94A3B8"; // muted
     default:
-      return "📄";
+      return "#94A3B8";
   }
 }
 
@@ -68,26 +65,55 @@ function FileTreeItem({ node, depth, onToggle, onFileClick }: FileTreeItemProps)
       <button
         onClick={handleClick}
         className={cn(
-          "flex items-center w-full px-2 py-0.5 text-left text-sm",
-          "hover:bg-[var(--bg-tertiary)] transition-colors",
-          "text-[var(--text-primary)]",
+          "flex items-center w-full px-2 py-[3px] text-left text-[11px]",
+          "hover:bg-[var(--bg-tertiary)] transition-colors rounded-sm group",
+          "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
         )}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        style={{ paddingLeft: `${depth * 12 + 10}px` }}
       >
+        {/* Expand/collapse indicator */}
         {node.isDirectory && (
-          <span className="mr-1 text-[10px] text-[var(--text-secondary)]">
-            {node.expanded ? "▼" : "▶"}
+          <span className={cn(
+            "mr-1 text-[8px] text-[var(--text-muted)] transition-transform",
+            node.expanded && "rotate-90"
+          )}>
+            ▶
           </span>
         )}
-        <span className="mr-1.5 text-xs">{getFileIcon(node.name, node.isDirectory)}</span>
-        <span className="truncate">{node.name}</span>
+        {!node.isDirectory && <span className="w-[10px] mr-1" />}
+
+        {/* File/folder icon */}
+        {node.isDirectory ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 shrink-0">
+            {node.expanded ? (
+              <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+            ) : (
+              <>
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+              </>
+            )}
+          </svg>
+        ) : (
+          <span
+            className="w-1.5 h-1.5 rounded-full mr-2 shrink-0"
+            style={{ backgroundColor: getFileColor(node.name) }}
+          />
+        )}
+
+        <span className="truncate font-[var(--font-mono)] text-[11px]">{node.name}</span>
+
         {node.loading && (
-          <span className="ml-auto text-[10px] text-[var(--text-secondary)]">…</span>
+          <span className="ml-auto text-[9px] text-[var(--accent)] animate-pulse">●</span>
         )}
       </button>
 
       {node.expanded && node.children && (
-        <div>
+        <div className="relative">
+          {/* Tree guide line */}
+          <div
+            className="absolute top-0 bottom-0 w-[1px] bg-[var(--border-subtle)]"
+            style={{ left: `${depth * 12 + 18}px` }}
+          />
           {node.children.map((child) => (
             <FileTreeItem
               key={child.path}
@@ -109,7 +135,6 @@ export function FileExplorer() {
   const workspacePath = useAppStore((s) => s.workspacePath);
   const openFile = useAppStore((s) => s.openFile);
 
-  // Load root directory
   const loadDirectory = useCallback(async (dirPath: string): Promise<TreeNode[]> => {
     try {
       const { items } = await fsApi.readdir(dirPath);
@@ -125,45 +150,32 @@ export function FileExplorer() {
     }
   }, []);
 
-  // Load initial tree when workspace changes
   useEffect(() => {
     if (!workspacePath) return;
     setError(null);
     loadDirectory(workspacePath).then(setTree);
   }, [workspacePath, loadDirectory]);
 
-  // Toggle directory expansion
   const handleToggle = useCallback(
     async (path: string) => {
       const toggleNode = (nodes: TreeNode[]): TreeNode[] =>
         nodes.map((node) => {
           if (node.path === path) {
-            if (node.expanded) {
-              // Collapse
-              return { ...node, expanded: false };
-            }
-            // Expand - load children
+            if (node.expanded) return { ...node, expanded: false };
             return { ...node, expanded: true, loading: true };
           }
-          if (node.children) {
-            return { ...node, children: toggleNode(node.children) };
-          }
+          if (node.children) return { ...node, children: toggleNode(node.children) };
           return node;
         });
 
       setTree((prev) => toggleNode(prev));
 
-      // Load children
       const children = await loadDirectory(path);
       setTree((prev) => {
         const updateNode = (nodes: TreeNode[]): TreeNode[] =>
           nodes.map((node) => {
-            if (node.path === path) {
-              return { ...node, children, loading: false };
-            }
-            if (node.children) {
-              return { ...node, children: updateNode(node.children) };
-            }
+            if (node.path === path) return { ...node, children, loading: false };
+            if (node.children) return { ...node, children: updateNode(node.children) };
             return node;
           });
         return updateNode(prev);
@@ -172,7 +184,6 @@ export function FileExplorer() {
     [loadDirectory],
   );
 
-  // Handle file click - load content and open in editor
   const handleFileClick = useCallback(
     async (entry: FsEntry) => {
       try {
@@ -187,8 +198,8 @@ export function FileExplorer() {
 
   if (!workspacePath) {
     return (
-      <div className="flex items-center justify-center h-full p-4 text-center text-sm text-[var(--text-secondary)]">
-        <p>No workspace open</p>
+      <div className="flex items-center justify-center h-full p-4 text-center">
+        <p className="text-xs text-[var(--text-muted)]">No workspace</p>
       </div>
     );
   }
@@ -196,22 +207,25 @@ export function FileExplorer() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center h-8 px-3 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide border-b border-[var(--border)] shrink-0">
+      <div className="flex items-center h-9 px-3 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-widest border-b border-[var(--border-subtle)] shrink-0">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+          <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+        </svg>
         Explorer
       </div>
 
-      {/* Error display */}
+      {/* Error */}
       {error && (
-        <div className="px-3 py-1 text-xs text-[var(--danger)] bg-[var(--danger)]/10">
+        <div className="px-3 py-1.5 text-[10px] text-[var(--danger)] bg-[var(--danger)]/5 border-b border-[var(--danger)]/20 font-[var(--font-mono)]">
           {error}
         </div>
       )}
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1.5">
         {tree.length === 0 && !error ? (
-          <div className="px-3 py-2 text-xs text-[var(--text-secondary)]">
-            Loading...
+          <div className="px-3 py-3 text-[10px] text-[var(--text-muted)] font-[var(--font-mono)] animate-pulse">
+            loading...
           </div>
         ) : (
           tree.map((node) => (
