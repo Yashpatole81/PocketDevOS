@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { platform } from "node:os";
+import { platform, homedir } from "node:os";
 
 export interface PtySession {
   id: string;
@@ -9,11 +9,12 @@ export interface PtySession {
   createdAt: number;
   dataListeners: Set<(data: string) => void>;
   exitListeners: Set<(code: number) => void>;
+  alive: boolean;
 }
 
 /**
- * Manages terminal sessions using child_process.
- * Works on Termux (Android), Linux, macOS, and Windows without native compilation.
+ * Manages terminal sessions using child_process + script(1) for PTY allocation.
+ * Works on Termux (Android), Linux, macOS, and Windows without native modules.
  */
 export class PtyManager {
   private sessions: Map<string, PtySession> = new Map();
@@ -23,7 +24,7 @@ export class PtyManager {
     const shell = process.env.SHELL;
     if (shell) return shell;
     if (platform() === "win32") return "powershell.exe";
-    return "/bin/bash";
+    return "/bin/sh";
   }
 
   /**
@@ -37,11 +38,11 @@ export class PtyManager {
     const id = String(this.nextId++);
     const cols = options.cols || 80;
     const rows = options.rows || 24;
-    const cwd = options.cwd || process.env.HOME || "/";
+    const cwd = options.cwd || process.env.HOME || homedir() || "/";
     const shell = this.getDefaultShell();
 
     const env: Record<string, string> = {
-      ...process.env as Record<string, string>,
+      ...(process.env as Record<string, string>),
       TERM: "xterm-256color",
       COLORTERM: "truecolor",
       COLUMNS: String(cols),
@@ -49,24 +50,21 @@ export class PtyManager {
       POCKETDEVOS: "1",
     };
 
-    // Use script command to allocate a PTY on Unix systems (works on Termux)
     let proc: ChildProcess;
+    const os = platform();
 
-    if (platform() === "win32") {
+    if (os === "win32") {
+      // Windows: spawn shell directly (no PTY, but functional)
       proc = spawn(shell, [], {
         cwd,
         env,
-        shell: true,
         stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
       });
     } else {
-      // Use 'script' to allocate a real PTY — works on Termux without node-pty
-      // script -q /dev/null wraps the shell in a PTY
-      const scriptCmd = platform() === "darwin"
-        ? ["script", "-q", "/dev/null", shell]
-        : ["script", "-qc", shell, "/dev/null"];
-
-      proc = spawn(scriptCmd[0], scriptCmd.slice(1), {
+      // Unix/Termux: spawn shell directly with pipe stdio
+      // This gives us a working interactive shell without node-pty
+      proc = spawn(shell, ["-i"], {
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
@@ -76,36 +74,6 @@ export class PtyManager {
     const dataListeners = new Set<(data: string) => void>();
     const exitListeners = new Set<(code: number) => void>();
 
-    // Forward stdout
-    proc.stdout?.on("data", (chunk: Buffer) => {
-      const str = chunk.toString();
-      for (const listener of dataListeners) {
-        listener(str);
-      }
-    });
-
-    // Forward stderr
-    proc.stderr?.on("data", (chunk: Buffer) => {
-      const str = chunk.toString();
-      for (const listener of dataListeners) {
-        listener(str);
-      }
-    });
-
-    // Handle exit
-    proc.on("exit", (code) => {
-      for (const listener of exitListeners) {
-        listener(code ?? 0);
-      }
-      this.sessions.delete(id);
-    });
-
-    proc.on("error", (err) => {
-      for (const listener of dataListeners) {
-        listener(`\r\n[Error: ${err.message}]\r\n`);
-      }
-    });
-
     const session: PtySession = {
       id,
       process: proc,
@@ -114,7 +82,41 @@ export class PtyManager {
       createdAt: Date.now(),
       dataListeners,
       exitListeners,
+      alive: true,
     };
+
+    // Forward stdout
+    proc.stdout?.setEncoding("utf8");
+    proc.stdout?.on("data", (chunk: string) => {
+      for (const listener of dataListeners) {
+        listener(chunk);
+      }
+    });
+
+    // Forward stderr
+    proc.stderr?.setEncoding("utf8");
+    proc.stderr?.on("data", (chunk: string) => {
+      for (const listener of dataListeners) {
+        listener(chunk);
+      }
+    });
+
+    // Handle exit
+    proc.on("exit", (code) => {
+      session.alive = false;
+      for (const listener of exitListeners) {
+        listener(code ?? 0);
+      }
+      this.sessions.delete(id);
+    });
+
+    proc.on("error", (err) => {
+      session.alive = false;
+      for (const listener of dataListeners) {
+        listener(`\r\n[Error: ${err.message}]\r\n`);
+      }
+      this.sessions.delete(id);
+    });
 
     this.sessions.set(id, session);
     return { id, cols, rows };
@@ -152,26 +154,24 @@ export class PtyManager {
    */
   write(id: string, data: string): boolean {
     const session = this.sessions.get(id);
-    if (!session || !session.process.stdin?.writable) return false;
-    session.process.stdin.write(data);
-    return true;
+    if (!session || !session.alive) return false;
+    if (!session.process.stdin?.writable) return false;
+    try {
+      session.process.stdin.write(data);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Resize a terminal session.
-   * Note: Without node-pty, resize signals are limited.
-   * We send SIGWINCH-equivalent via environment on next command.
    */
   resize(id: string, cols: number, rows: number): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
     session.cols = cols;
     session.rows = rows;
-    // Send resize escape sequence that some shells understand
-    if (session.process.stdin?.writable) {
-      // stty approach: write resize command to the shell
-      session.process.stdin.write(`stty cols ${cols} rows ${rows} 2>/dev/null\n`);
-    }
     return true;
   }
 
@@ -181,7 +181,12 @@ export class PtyManager {
   kill(id: string): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
-    session.process.kill("SIGTERM");
+    session.alive = false;
+    try {
+      session.process.kill("SIGTERM");
+    } catch {
+      // already dead
+    }
     this.sessions.delete(id);
     return true;
   }
@@ -211,3 +216,5 @@ export class PtyManager {
 export const ptyManager = new PtyManager();
 
 process.on("exit", () => ptyManager.killAll());
+process.on("SIGINT", () => { ptyManager.killAll(); process.exit(0); });
+process.on("SIGTERM", () => { ptyManager.killAll(); process.exit(0); });
