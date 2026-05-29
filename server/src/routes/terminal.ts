@@ -2,8 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { ptyManager } from "../services/pty.js";
 
 /**
- * Terminal routes: create/list/kill PTY sessions.
- * Actual I/O streaming happens over WebSocket (see ws/terminal.ts).
+ * Terminal routes: create/list/kill sessions + WebSocket I/O.
  */
 export async function terminalRoutes(app: FastifyInstance) {
   // Create a new terminal session
@@ -54,22 +53,22 @@ export async function terminalRoutes(app: FastifyInstance) {
       return;
     }
 
-    // PTY output -> WebSocket -> client (xterm.js)
-    const onData = session.process.onData((data: string) => {
+    // Terminal output -> WebSocket -> client (xterm.js)
+    const disposeData = ptyManager.onData(id, (data: string) => {
       if (socket.readyState === 1) {
         socket.send(data);
       }
     });
 
-    // PTY exit -> notify client
-    const onExit = session.process.onExit(({ exitCode }) => {
+    // Terminal exit -> notify client
+    const disposeExit = ptyManager.onExit(id, (exitCode: number) => {
       if (socket.readyState === 1) {
         socket.send(`\r\n[Process exited with code ${exitCode}]\r\n`);
         socket.close(1000, "Process exited");
       }
     });
 
-    // Client input -> PTY stdin
+    // Client input -> terminal stdin
     socket.on("message", (data: Buffer | string) => {
       const str = typeof data === "string" ? data : data.toString();
 
@@ -86,13 +85,13 @@ export async function terminalRoutes(app: FastifyInstance) {
         }
       }
 
-      session.process.write(str);
+      ptyManager.write(id, str);
     });
 
     // Cleanup on disconnect
     socket.on("close", () => {
-      onData.dispose();
-      onExit.dispose();
+      if (disposeData) disposeData();
+      if (disposeExit) disposeExit();
     });
   });
 }
