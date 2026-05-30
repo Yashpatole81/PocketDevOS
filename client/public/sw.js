@@ -1,12 +1,7 @@
 const CACHE_NAME = "pocketdevos-v1";
 
-// App shell files to cache for offline UI
-const APP_SHELL = [
-  "/",
-  "/index.html",
-];
+const APP_SHELL = ["/", "/index.html"];
 
-// Install: cache app shell
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
@@ -14,41 +9,41 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch: serve from cache for app shell, network-first for everything else
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Don't cache API calls or WebSocket upgrades
+  // Only handle http/https — skip chrome-extension, etc.
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return;
+  }
+
+  // Don't cache API calls or WebSocket
   if (url.pathname.startsWith("/api") || request.headers.get("upgrade") === "websocket") {
     return;
   }
 
-  // For navigation requests and static assets: cache-first with network fallback
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {
-        // Return cached, but also update cache in background
         event.waitUntil(
           fetch(request)
             .then((response) => {
-              if (response.ok) {
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+              if (response && response.ok) {
+                caches.open(CACHE_NAME).then((cache) => {
+                  try { cache.put(request, response.clone()); } catch (e) {}
+                });
               }
             })
             .catch(() => {})
@@ -56,13 +51,16 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
 
-      // Not in cache: fetch from network and cache it
       return fetch(request).then((response) => {
-        if (response.ok && request.method === "GET") {
+        if (response && response.ok && request.method === "GET") {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          caches.open(CACHE_NAME).then((cache) => {
+            try { cache.put(request, clone); } catch (e) {}
+          });
         }
         return response;
+      }).catch(() => {
+        return new Response("Offline", { status: 503 });
       });
     })
   );

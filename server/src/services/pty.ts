@@ -1,5 +1,6 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { platform, homedir } from "node:os";
+import { existsSync } from "node:fs";
 
 export interface PtySession {
   id: string;
@@ -13,22 +14,30 @@ export interface PtySession {
 }
 
 /**
- * Manages terminal sessions using child_process + script(1) for PTY allocation.
- * Works on Termux (Android), Linux, macOS, and Windows without native modules.
+ * Detect if running inside Termux.
+ */
+function isTermux(): boolean {
+  return existsSync("/data/data/com.termux/files/usr/bin/bash");
+}
+
+/**
+ * Manages terminal sessions.
+ * Uses `script` command to allocate a real PTY on Unix/Termux.
+ * Falls back to direct shell spawn on Windows.
  */
 export class PtyManager {
   private sessions: Map<string, PtySession> = new Map();
   private nextId = 1;
 
   private getDefaultShell(): string {
-    const shell = process.env.SHELL;
-    if (shell) return shell;
+    if (process.env.SHELL) return process.env.SHELL;
+    if (isTermux()) return "/data/data/com.termux/files/usr/bin/bash";
     if (platform() === "win32") return "powershell.exe";
-    return "/bin/sh";
+    return "/bin/bash";
   }
 
   /**
-   * Create a new terminal session.
+   * Create a new terminal session with a real PTY via `script`.
    */
   create(options: {
     cols?: number;
@@ -54,17 +63,22 @@ export class PtyManager {
     const os = platform();
 
     if (os === "win32") {
-      // Windows: spawn shell directly (no PTY, but functional)
       proc = spawn(shell, [], {
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
-        shell: false,
+      });
+    } else if (os === "darwin") {
+      // macOS: script -q /dev/null shell
+      proc = spawn("script", ["-q", "/dev/null", shell], {
+        cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
       });
     } else {
-      // Unix/Termux: spawn shell directly with pipe stdio
-      // This gives us a working interactive shell without node-pty
-      proc = spawn(shell, ["-i"], {
+      // Linux/Termux: script -qfc "shell" /dev/null
+      // The -f flag flushes output immediately
+      proc = spawn("script", ["-qfc", shell, "/dev/null"], {
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
@@ -93,7 +107,7 @@ export class PtyManager {
       }
     });
 
-    // Forward stderr
+    // Forward stderr to same output
     proc.stderr?.setEncoding("utf8");
     proc.stderr?.on("data", (chunk: string) => {
       for (const listener of dataListeners) {
@@ -113,7 +127,7 @@ export class PtyManager {
     proc.on("error", (err) => {
       session.alive = false;
       for (const listener of dataListeners) {
-        listener(`\r\n[Error: ${err.message}]\r\n`);
+        listener(`\r\n\x1b[31m[Error: ${err.message}]\x1b[0m\r\n`);
       }
       this.sessions.delete(id);
     });
@@ -122,16 +136,10 @@ export class PtyManager {
     return { id, cols, rows };
   }
 
-  /**
-   * Get a session by ID.
-   */
   get(id: string): PtySession | undefined {
     return this.sessions.get(id);
   }
 
-  /**
-   * Register a data listener (output from terminal).
-   */
   onData(id: string, listener: (data: string) => void): (() => void) | null {
     const session = this.sessions.get(id);
     if (!session) return null;
@@ -139,9 +147,6 @@ export class PtyManager {
     return () => { session.dataListeners.delete(listener); };
   }
 
-  /**
-   * Register an exit listener.
-   */
   onExit(id: string, listener: (code: number) => void): (() => void) | null {
     const session = this.sessions.get(id);
     if (!session) return null;
@@ -149,9 +154,6 @@ export class PtyManager {
     return () => { session.exitListeners.delete(listener); };
   }
 
-  /**
-   * Write data to a terminal session (user input).
-   */
   write(id: string, data: string): boolean {
     const session = this.sessions.get(id);
     if (!session || !session.alive) return false;
@@ -164,26 +166,30 @@ export class PtyManager {
     }
   }
 
-  /**
-   * Resize a terminal session.
-   */
   resize(id: string, cols: number, rows: number): boolean {
     const session = this.sessions.get(id);
-    if (!session) return false;
+    if (!session || !session.alive) return false;
     session.cols = cols;
     session.rows = rows;
+    // Send resize to the PTY via stty
+    try {
+      if (session.process.stdin?.writable) {
+        // Use ANSI escape to resize — some terminals respond to this
+        const resizeSeq = `\x1b[8;${rows};${cols}t`;
+        session.process.stdin.write(resizeSeq);
+      }
+    } catch {
+      // ignore
+    }
     return true;
   }
 
-  /**
-   * Kill and remove a terminal session.
-   */
   kill(id: string): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
     session.alive = false;
     try {
-      session.process.kill("SIGTERM");
+      session.process.kill("SIGKILL");
     } catch {
       // already dead
     }
@@ -191,18 +197,12 @@ export class PtyManager {
     return true;
   }
 
-  /**
-   * Kill all sessions.
-   */
   killAll(): void {
     for (const [id] of this.sessions) {
       this.kill(id);
     }
   }
 
-  /**
-   * List all active sessions.
-   */
   list(): Array<{ id: string; cols: number; rows: number; createdAt: number }> {
     return Array.from(this.sessions.values()).map((s) => ({
       id: s.id,

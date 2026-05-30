@@ -41,9 +41,9 @@ function applyThemeToRoot(theme: Theme) {
 
 function loadSavedThemeId(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) || "cyberdeck";
+    return localStorage.getItem(STORAGE_KEY) || "midnight";
   } catch {
-    return "cyberdeck";
+    return "midnight";
   }
 }
 
