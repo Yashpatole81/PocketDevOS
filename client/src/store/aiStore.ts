@@ -27,6 +27,22 @@ export interface PendingApproval {
 
 export type AiStatus = "idle" | "thinking" | "awaiting-approval" | "error";
 
+export interface AgentAction {
+  id: string;
+  type: 'file-read' | 'file-write' | 'search' | 'test-run' | 'code-gen' | 'approval-wait' | 'shell-run';
+  label: string;
+  timestamp: number;
+  status: 'running' | 'success' | 'failure' | 'skipped';
+  detail?: string;
+}
+
+export interface ContextAttachment {
+  id: string;
+  type: 'file' | 'terminal-output' | 'git-ref';
+  name: string;
+  content: string;
+}
+
 interface AiState {
   messages: ChatMessage[];
   status: AiStatus;
@@ -38,6 +54,12 @@ interface AiState {
   error: string | null;
   panelOpen: boolean;
   settingsOpen: boolean;
+
+  // Agent activity and context attachments
+  agentActions: AgentAction[];
+  activityFeedCollapsed: boolean;
+  contextAttachments: ContextAttachment[];
+  scrollPosition: number;
 
   // Actions
   addMessage: (message: ChatMessage) => void;
@@ -52,6 +74,17 @@ interface AiState {
   togglePanel: () => void;
   setPanel: (open: boolean) => void;
   toggleSettings: () => void;
+
+  // Agent activity actions
+  addAgentAction: (action: AgentAction) => void;
+  updateAgentAction: (id: string, update: Partial<AgentAction>) => void;
+  toggleActivityFeed: () => void;
+
+  // Context attachment actions
+  addAttachment: (attachment: ContextAttachment) => void;
+  removeAttachment: (id: string) => void;
+  clearAttachments: () => void;
+  setScrollPosition: (pos: number) => void;
 }
 
 let messageCounter = 0;
@@ -70,6 +103,12 @@ export const useAiStore = create<AiState>((set, get) => ({
   error: null,
   panelOpen: false,
   settingsOpen: false,
+
+  // Agent activity and context attachments
+  agentActions: [],
+  activityFeedCollapsed: false,
+  contextAttachments: [],
+  scrollPosition: 0,
 
   addMessage: (message) => {
     set((state) => ({ messages: [...state.messages, message] }));
@@ -126,4 +165,34 @@ export const useAiStore = create<AiState>((set, get) => ({
   setPanel: (open) => set({ panelOpen: open }),
 
   toggleSettings: () => set((state) => ({ settingsOpen: !state.settingsOpen })),
+
+  // Agent activity actions
+  addAgentAction: (action) => {
+    set((state) => ({ agentActions: [...state.agentActions, action] }));
+  },
+
+  updateAgentAction: (id, update) => {
+    set((state) => ({
+      agentActions: state.agentActions.map((action) =>
+        action.id === id ? { ...action, ...update } : action
+      ),
+    }));
+  },
+
+  toggleActivityFeed: () => set((state) => ({ activityFeedCollapsed: !state.activityFeedCollapsed })),
+
+  // Context attachment actions
+  addAttachment: (attachment) => {
+    set((state) => ({ contextAttachments: [...state.contextAttachments, attachment] }));
+  },
+
+  removeAttachment: (id) => {
+    set((state) => ({
+      contextAttachments: state.contextAttachments.filter((a) => a.id !== id),
+    }));
+  },
+
+  clearAttachments: () => set({ contextAttachments: [] }),
+
+  setScrollPosition: (pos) => set({ scrollPosition: pos }),
 }));

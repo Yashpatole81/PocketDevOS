@@ -32,9 +32,9 @@ function GeneralSection() {
             >
               <div
                 className="w-full h-7 rounded-lg mb-2 flex gap-0.5 overflow-hidden border border-black/20"
-                style={{ background: t.colors.bgPrimary }}
+                style={{ background: t.colors.background }}
               >
-                <div className="w-1/4 h-full" style={{ background: t.colors.bgSecondary }} />
+                <div className="w-1/4 h-full" style={{ background: t.colors.surface1 }} />
                 <div className="flex-1 h-full flex flex-col gap-0.5 p-1 justify-center">
                   <div className="h-[2px] rounded-full" style={{ background: t.colors.accent, width: "60%" }} />
                   <div className="h-[2px] rounded-full" style={{ background: t.colors.textMuted, width: "80%" }} />
